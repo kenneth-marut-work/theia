@@ -95,6 +95,7 @@ export class DebugBreakpointWidget implements Disposable {
         this.zone.containerNode.appendChild(inputNode);
 
         const input = this._input = await this.createInput(inputNode);
+        const inputEditor = input.getControl();
         if (this.toDispose.disposed) {
             input.dispose();
             return;
@@ -103,23 +104,30 @@ export class DebugBreakpointWidget implements Disposable {
         this.toDispose.push(monaco.modes.CompletionProviderRegistry.register({ scheme: input.uri.scheme }, {
             provideCompletionItems: async (model, position, context, token) => {
                 const suggestions = [];
-                if ((this.context === 'condition' || this.context === 'logMessage')
-                    && input.uri.toString() === model.uri.toString()) {
+                if ((this.context === 'condition') || (this.context === 'logMessage' && DebugBreakpointWidget.isCurlyBracketOpen(inputEditor)) &&
+                    input.uri.toString() === model.uri.toString()) {
                     const editor = this.editor.getControl();
-                    const items = await monaco.suggest.provideSuggestionItems(
-                        editor.getModel()!,
-                        new monaco.Position(editor.getPosition()!.lineNumber, 1),
-                        new monaco.suggest.CompletionOptions(undefined, new Set<monaco.languages.CompletionItemKind>().add(monaco.languages.CompletionItemKind.Snippet)),
-                        context, token);
+                    const editorModel = editor.getModel();
+                    const editorPosition = editor.getPosition();
+                    const items = editorModel && editorPosition ? await monaco.suggest.provideSuggestionItems(
+                        editorModel,
+                        new monaco.Position(editorPosition.lineNumber, 1),
+                        new monaco.suggest.CompletionOptions(
+                            undefined,
+                            new Set<monaco.languages.CompletionItemKind>().add(monaco.languages.CompletionItemKind.Snippet),
+                        ),
+                        context,
+                        token,
+                    ) : [];
                     let overwriteBefore = 0;
                     if (this.context === 'condition') {
                         overwriteBefore = position.column - 1;
                     } else {
                         // Inside the curly brackets, need to count how many useful characters are behind the position so they would all be taken into account
-                        const value = editor.getModel()!.getValue();
+                        const value = inputEditor.getValue();
                         while ((position.column - 2 - overwriteBefore >= 0)
                             && value[position.column - 2 - overwriteBefore] !== '{' && value[position.column - 2 - overwriteBefore] !== ' ') {
-                            overwriteBefore++;
+                            overwriteBefore += 1;
                         }
                     }
                     for (const { completion } of items) {
@@ -132,9 +140,12 @@ export class DebugBreakpointWidget implements Disposable {
         }));
         this.toDispose.push(this.zone.onDidLayoutChange(dimension => this.layout(dimension)));
         this.toDispose.push(input.getControl().onDidChangeModelContent(() => {
-            const heightInLines = input.getControl().getModel()!.getLineCount() + 1;
-            this.zone.layout(heightInLines);
-            this.updatePlaceholder();
+            const model = input.getControl().getModel();
+            if (model) {
+                const heightInLines = model.getLineCount() + 1;
+                this.zone.layout(heightInLines);
+                this.updatePlaceholder();
+            }
         }));
         this.toDispose.push(Disposable.create(() => ReactDOM.unmountComponentAtNode(selectNode)));
     }
@@ -260,4 +271,16 @@ export class DebugBreakpointWidget implements Disposable {
 }
 export namespace DebugBreakpointWidget {
     export type Context = keyof Pick<DebugProtocol.SourceBreakpoint, 'condition' | 'hitCondition' | 'logMessage'>;
+
+    export const isCurlyBracketOpen = (editor: monaco.editor.IStandaloneCodeEditor): boolean => {
+        const model = editor.getModel();
+        const position = editor.getPosition();
+        if (model && position) {
+            const prevBracket = model.findPrevBracket(position);
+            if (prevBracket?.isOpen) {
+                return true;
+            }
+        }
+        return false;
+    };
 }
