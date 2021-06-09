@@ -94,27 +94,29 @@ export class DebugBreakpointWidget implements Disposable {
         inputNode.classList.add('theia-debug-breakpoint-input');
         this.zone.containerNode.appendChild(inputNode);
 
-        const input = this._input = await this.createInput(inputNode);
-        const inputEditor = input.getControl();
+        const breakpointInput = this._input = await this.createInput(inputNode);
+        const breakpointInputEditor = breakpointInput.getControl();
         if (this.toDispose.disposed) {
-            input.dispose();
+            breakpointInput.dispose();
             return;
         }
-        this.toDispose.push(input);
-        this.toDispose.push(monaco.modes.CompletionProviderRegistry.register({ scheme: input.uri.scheme }, {
+        this.toDispose.push(breakpointInput);
+        this.toDispose.push(monaco.modes.CompletionProviderRegistry.register({ scheme: breakpointInput.uri.scheme }, {
             provideCompletionItems: async (model, position, context, token) => {
                 const suggestions = [];
-                if ((this.context === 'condition') || (this.context === 'logMessage' && DebugBreakpointWidget.isCurlyBracketOpen(inputEditor)) &&
-                    input.uri.toString() === model.uri.toString()) {
-                    const editor = this.editor.getControl();
-                    const editorModel = editor.getModel();
-                    const editorPosition = editor.getPosition();
-                    const items = editorModel && editorPosition ? await monaco.suggest.provideSuggestionItems(
-                        editorModel,
-                        new monaco.Position(editorPosition.lineNumber, 1),
+                const shouldProvideAutoCompleteInContext = (this.context === 'condition') ||
+                    (this.context === 'logMessage' && DebugBreakpointWidget.isCurlyBracketOpen(breakpointInputEditor));
+                const doesInputEditorMatchModel = breakpointInput.uri.toString() === model.uri.toString();
+                if (shouldProvideAutoCompleteInContext && doesInputEditorMatchModel) {
+                    const sourceCodeEditor = this.editor.getControl();
+                    const sourceCodeEditorModel = sourceCodeEditor.getModel();
+                    const sourceCodeEditorPosition = sourceCodeEditor.getPosition();
+                    const items = sourceCodeEditorModel && sourceCodeEditorPosition ? await monaco.suggest.provideSuggestionItems(
+                        sourceCodeEditorModel,
+                        new monaco.Position(sourceCodeEditorPosition.lineNumber, 1),
                         new monaco.suggest.CompletionOptions(
                             undefined,
-                            new Set<monaco.languages.CompletionItemKind>().add(monaco.languages.CompletionItemKind.Snippet),
+                            new Set<monaco.languages.CompletionItemKind>([monaco.languages.CompletionItemKind.Snippet]),
                         ),
                         context,
                         token,
@@ -124,7 +126,7 @@ export class DebugBreakpointWidget implements Disposable {
                         overwriteBefore = position.column - 1;
                     } else {
                         // Inside the curly brackets, need to count how many useful characters are behind the position so they would all be taken into account
-                        const value = inputEditor.getValue();
+                        const value = breakpointInputEditor.getValue();
                         while ((position.column - 2 - overwriteBefore >= 0)
                             && value[position.column - 2 - overwriteBefore] !== '{' && value[position.column - 2 - overwriteBefore] !== ' ') {
                             overwriteBefore += 1;
@@ -139,8 +141,8 @@ export class DebugBreakpointWidget implements Disposable {
             }
         }));
         this.toDispose.push(this.zone.onDidLayoutChange(dimension => this.layout(dimension)));
-        this.toDispose.push(input.getControl().onDidChangeModelContent(() => {
-            const model = input.getControl().getModel();
+        this.toDispose.push(breakpointInput.getControl().onDidChangeModelContent(() => {
+            const model = breakpointInput.getControl().getModel();
             if (model) {
                 const heightInLines = model.getLineCount() + 1;
                 this.zone.layout(heightInLines);
