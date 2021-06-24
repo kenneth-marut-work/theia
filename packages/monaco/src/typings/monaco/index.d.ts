@@ -431,7 +431,7 @@ declare module monaco.editor {
         read(): string | null;
     }
 
-    // https://github.com/theia-ide/vscode/blob/d24b5f70c69b3e75cd10c6b5247a071265ccdd38/src/vs/editor/common/model.ts#L461
+    // https://github.com/microsoft/vscode/blob/b4c1bd0a9b03c749ea011b06c6d2676c8091a70c/src/vs/editor/common/model.ts#L493
     export interface IFoundBracket {
         range: Range;
         open: string[];
@@ -468,14 +468,14 @@ declare module monaco.editor {
         /**
          * Find the first bracket in the model before `position`.
          * @internal
-         * https://github.com/theia-ide/vscode/blob/d24b5f70c69b3e75cd10c6b5247a071265ccdd38/src/vs/editor/common/model.ts#L886
+         * https://github.com/microsoft/vscode/blob/b4c1bd0a9b03c749ea011b06c6d2676c8091a70c/src/vs/editor/common/model.ts#L950
          */
         findPrevBracket(position: IPosition): IFoundBracket | null;
 
         /**
          * Find the first bracket in the model after `position`.
          * @internal
-         * https://github.com/theia-ide/vscode/blob/d24b5f70c69b3e75cd10c6b5247a071265ccdd38/src/vs/editor/common/model.ts#L894
+         * https://github.com/microsoft/vscode/blob/b4c1bd0a9b03c749ea011b06c6d2676c8091a70c/src/vs/editor/common/model.ts#L958
          */
         findNextBracket(position: IPosition): IFoundBracket | null;
     }
